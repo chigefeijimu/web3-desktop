@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 use rusqlite::{Connection, params, Result};
+use serde::__private::de::IdentifierDeserializer;
 use serde::Serialize;
 use solana_sdk::signature::Keypair;
 use solana_sdk::signer::Signer;
@@ -18,11 +19,11 @@ CREATE TABLE IF NOT EXISTS web3_wallet (
     public_key TEXT NOT NULL PRIMARY KEY,
     private_key TEXT NOT NULL
 );";
+const RES_SUCCESS: &str = "创建钱包完成！";
+const RES_ERR: &str = "创建钱包失败！";
 
 #[tauri::command]
 fn greet(name: &str) -> String {
-
-
     loop{
         let keypair: Keypair = Keypair::new();
         let public_key = keypair.pubkey().to_string();
@@ -33,7 +34,7 @@ fn greet(name: &str) -> String {
                 public_key,
                 private_key
             };
-            return save_file(&wallet);
+            return save_db(&wallet)
         }
     }
 }
@@ -45,8 +46,6 @@ struct Wallet {
 }
 
 fn save_file(wallet: &Wallet) -> String {
-    let res_success: String = String::from("创建钱包完成！");
-    let res_err: String = String::from("创建钱包失败！");
     //创建本地文件
     let file_path = String::from("./wallet.json");
     println!("{}", file_path);
@@ -54,7 +53,7 @@ fn save_file(wallet: &Wallet) -> String {
         Ok(file) => file,
         Err(e) => {
             eprintln!("无法创建文件: {}", e);
-            return res_err;
+            return RES_ERR.to_string();
         }
     };
 
@@ -62,7 +61,7 @@ fn save_file(wallet: &Wallet) -> String {
         Ok(data) => data,
         Err(e) => {
             eprintln!("无法序列化JSON数据，原因：{}", e);
-            return res_err;
+            return RES_ERR.to_string();
         }
     };
     //像文件中写入数据
@@ -70,14 +69,33 @@ fn save_file(wallet: &Wallet) -> String {
         Ok(_) => println!("创建钱包并写入文件成功！"),
         Err(e) => {
             eprintln!("写入序列化JSON数据失败，原因：{}", e);
-            return res_err;
+            return RES_ERR.to_string();
         }
     };
-    return res_success
+    return RES_SUCCESS.to_string()
+}
+
+fn save_db(wallet: &Wallet) -> String {
+    let insert_sql: &str = "INSERT INTO web3_wallet(name, public_key, private_key) VALUES(?1, ?2, ?3)";
+    let conn: Connection = match Connection::open(DB_PATH) {
+        Ok(connection) => connection,
+        Err(e) => {
+            eprintln!("数据库插入钱包数据失败， 原因：{}", e);
+            return RES_ERR.to_string()
+        }
+    };
+    match conn.execute(insert_sql, params!["", wallet.public_key, wallet.private_key]) {
+        Ok(count) => count,
+        Err(e) => {
+            eprintln!("数据库插入钱包数据失败，原因：{}", e);
+            return RES_ERR.to_string()
+        }
+    };
+    return RES_SUCCESS.to_string()
 }
 
 fn init_db() -> Result<Arc<Mutex<Connection>>> {
-    let conn = Connection::open(DB_PATH)?;
+    let conn: Connection = Connection::open(DB_PATH)?;
     conn.execute(CREATE_TABLE_SQL, params![])?;
     Ok(Arc::new(Mutex::new(conn)))
 }
