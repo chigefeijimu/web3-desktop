@@ -32,10 +32,6 @@ pub fn App() -> impl IntoView {
         ev.prevent_default();
         spawn_local(async move {
             let name = name.get_untracked();
-            if name.is_empty() {
-                return;
-            }
-
             let args = to_value(&GreetArgs { name: &name }).unwrap();
             // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
             let new_msg = invoke("greet", args).await.as_string().unwrap();
@@ -69,10 +65,10 @@ pub fn App() -> impl IntoView {
 
             <p>"欢迎来到web3的世界！"</p>
 
-            <form class="row" on:submit=greet>
+            <form class="row" id="mainForm" on:submit=greet>
                 <input
                     id="greet-input"
-                    placeholder="请输入"
+                    placeholder="请输入想要的地址前缀"
                     on:input=update_name
                 />
                 <input
@@ -81,7 +77,7 @@ pub fn App() -> impl IntoView {
                     placeholder="请选择钱包文件夹"
                     on:change=on_change
                 />
-                <button type="submit">"确定"</button>
+                <button type="submit">"创建钱包"</button>
             </form>
 
             <p><b>{ move || greet_msg.get() }</b></p>
